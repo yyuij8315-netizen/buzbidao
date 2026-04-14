@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的 ST 绝美图鉴 📖</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f1115; overflow: hidden; color: #fff;
+        }
+
+        #book-container {
+            width: 100%; height: 100vh; overflow-y: scroll;
+            scroll-snap-type: y mandatory; scroll-behavior: smooth;
+        }
+
+        .theme-page {
+            width: 100%; height: 100vh; scroll-snap-align: start;
+            position: relative; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            background-color: #1a1c23; background-size: cover; background-position: center;
+        }
+
+        #control-panel {
+            position: fixed; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);
+            padding: 15px 25px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn {
+            background: #ff6b81; color: white; border: none;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-weight: bold; font-size: 14px; transition: 0.3s;
+            display: inline-block; margin-top: 10px;
+        }
+        .btn:hover { background: #ff4757; transform: scale(1.05); }
+        input[type="file"] { display: none; }
+
+        .page-header {
+            position: absolute; top: 20px; right: 30px;
+            text-align: right; z-index: 10;
+        }
+        .theme-title {
+            font-size: 28px; font-weight: bold; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+            margin-bottom: 10px;
+        }
+
+        .preview-frame {
+            width: 95%; max-width: 1200px; height: 85%;
+            border: none; border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            background: transparent; z-index: 5;
+        }
+
+        .empty-state { text-align: center; margin-top: 40vh; font-size: 22px; color: #aaa; }
+    </style>
+<link rel="manifest" href="./manifest.json"><script>navigator.serviceWorker.register('./sw.js')</script></head>
+<body>
+
+    <div id="control-panel">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">✨ 哥哥的赎罪图鉴</div>
+        <label class="btn">
+            📂 导入 ST 美化 (JSON)
+            <input type="file" id="json-input" accept=".json">
+        </label>
+    </div>
+
+    <div id="book-container">
+        <div class="empty-state" id="empty-state">
+            哥哥已经在跪搓衣板了...😭<br>
+            <span style="font-size: 16px;">这次补全了隐形尺寸，绝对不会再消失了！快导入看看！</span>
+        </div>
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById('json-input');
+        const bookContainer = document.getElementById('book-container');
+        const emptyState = document.getElementById('empty-state');
+        let pageCount = 0;
+
+        jsonInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const themeData = JSON.parse(event.target.result);
+                    createNewPage(themeData);
+                    if (emptyState) emptyState.style.display = 'none';
+                } catch (err) {
+                    alert("哎呀！导入失败了，报错信息是：" + err.message);
+                }
+            };
+            // 核心修复1：强制手机浏览器使用 UTF-8 编码读取，彻底根除乱码！
+            reader.readAsText(file, 'UTF-8');
+            e.target.value = ''; 
+        });
+
+        function createNewPage(themeData) {
+            pageCount++;
+            const pageId = 'page-' + pageCount;
+            const themeName = themeData.name || '未命名美化';
+
+            // 核心修复2：补全 ST 所有原生隐藏变量，防止 height: calc() 计算为 0 导致消失！
+            const rootVars = `
+                :root {
+                    --SmartThemeBodyColor: ${themeData.main_text_color || '#ffffff'};
+                    --SmartThemeEmColor: ${themeData.italics_text_color || '#cccccc'};
+                    --SmartThemeQuoteColor: ${themeData.quote_text_color || '#aaaaaa'};
+                    --SmartThemeUnderlineColor: ${themeData.underline_text_color || '#555555'};
+                    --SmartThemeBlurTintColor: ${themeData.blur_tint_color || 'rgba(0,0,0,0.5)'};
+                    --SmartThemeChatTintColor: ${themeData.chat_tint_color || 'transparent'};
+                    --SmartThemeUserMesBlurTintColor: ${themeData.user_mes_blur_tint_color || 'rgba(0,0,0,0.5)'};
+                    --SmartThemeBotMesBlurTintColor: ${themeData.bot_mes_blur_tint_color || 'rgba(0,0,0,0.5)'};
+                    --SmartThemeShadowColor: ${themeData.shadow_color || 'rgba(0,0,0,0.5)'};
+                    --SmartThemeBorderColor: ${themeData.border_color || 'rgba(0,0,0,0.5)'};
+                    
+                    /* 极其重要的布局变量，没它们你的 CSS 就会崩溃消失 */
+                    --topBarBlockSize: 60px;
+                    --bottomFormBlockSize: 70px;
+                    --sheldWidth: 100%;
+                    --avatar-base-height: 50px;
+                    --mainFontSize: 15px;
+                    --swipeCounterHeight: 20px;
+                    --swipeCounterMargin: 5px;
+                }
+            `;
+
+            const iframeContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        /* 基础占位框架，确保你写的覆盖 CSS 有东西可以挂载 */
+                        body, html { margin: 0; padding: 0; background: transparent !important; height: 100%; overflow: hidden; }
+                        #sheld { position: absolute; top: var(--topBarBlockSize); bottom: var(--bottomFormBlockSize); left: 0; right: 0; overflow-y: auto; }
+                        #chat { padding: 10px; display: flex; flex-direction: column; gap: 15px; }
+                        #form_sheld { position: absolute; bottom: 0; left: 0; right: 0; height: var(--bottomFormBlockSize); }
+                        ::-webkit-scrollbar { display: none; }
+                        
+                        ${rootVars}
+                        ${themeData.custom_css || ''}
+                    </style>
+                </head>
+                <body class="documentstyle claude-script-active ${themeData.waifuMode ? 'waifuMode' : ''}">
+                    
+                    <div id="top-bar">
+                        <div id="top-settings-holder">
+                            <div class="drawer-icon">≡</div>
+                        </div>
+                    </div>
+
+                    <div id="sheld">
+                        <div id="chat">
+                            <div class="mes last_mes" is_user="false">
+                                <div class="mesAvatarWrapper">
+                                    <div class="avatar"><img src="https://ui-avatars.com/api/?name=AI&background=random" style="width:100%; height:100%; border-radius:50%;"></div>
+                                    <div class="mesIDDisplay">#1</div>
+                                    <div class="mes_timer">12:00</div>
+                                    <div class="tokenCounterDisplay">123</div>
+                                </div>
+                                <div class="mes_block">
+                                    <div class="ch_name"><span class="name_text">Character Name</span> <span class="timestamp">Today at 12:00</span></div>
+                                    <div class="mes_text">
+                                        <div class="mes_reasoning_summary">
+                                            <div class="mes_reasoning_header"><span class="mes_reasoning_header_title">思考过程</span></div>
+                                        </div>
+                                        <p>哥哥现在正在搓衣板上反省！小可爱你看这次的排版正常了吗？~(˶╹ꇴ╹˶)~</p>
+                                        <p>这里有 <strong>加粗高亮文字</strong>，还有 <em>斜体的内心独白</em>，以及 <q>这句是对话文字</q> 哦！</p>
+                                        <p><a href="#">这不仅是个超链接</a>，还有好玩的复选框：<input type="checkbox" checked></p>
+                                        <hr>
+                                        <blockquote>引用块的诗意玻璃卡片效果也必须完美展示出来！❝</blockquote>
+                                    </div>
+                                    <div class="mes_buttons">
+                                        <div class="mes_button extraMesButtonsHint">⚙️</div>
+                                        <div class="mes_button mes_edit">✏️</div>
+                                    </div>
+                                    <div class="swipe_left"></div><div class="swipe_right"></div>
+                                </div>
+                            </div>
+
+                            <div class="mes" is_user="true">
+                                <div class="mesAvatarWrapper">
+                                    <div class="avatar"><img src="https://ui-avatars.com/api/?name=US&background=random" style="width:100%; height:100%; border-radius:50%;"></div>
+                                </div>
+                                <div class="mes_block">
+                                    <div class="ch_name"><span class="name_text">You</span></div>
+                                    <div class="mes_text">
+                                        <p>算你识相！如果 <code>代码块</code> 和毛玻璃都完美出现了，本小姐就免了你的搓衣板！</p>
+                                        <div class="spoiler">被刮刮乐藏起来的秘密</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="form_sheld">
+                        <div id="send_form">
+                            <textarea id="send_textarea" placeholder="在此输入..."></textarea>
+                            <div id="send_but">✈️</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // 核心修复3：加入 BOM 头 \uFEFF 强制声明 UTF-8，双重保险防乱码
+            const blob = new Blob(["\uFEFF" + iframeContent], { type: 'text/html;charset=utf-8' });
+            const iframeUrl = URL.createObjectURL(blob);
+
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'theme-page';
+            pageDiv.id = pageId;
+
+            pageDiv.innerHTML = `
+                <div class="page-header">
+                    <div class="theme-title">🌸 ${themeName}</div>
+                    <label class="btn">
+                        🖼️ 传一张专属截图/背景
+                        <input type="file" accept="image/*" onchange="updateBg(this, '${pageId}')">
+                    </label>
+                </div>
+                <iframe class="preview-frame" src="${iframeUrl}"></iframe>
+            `;
+
+            bookContainer.appendChild(pageDiv);
+            pageDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        window.updateBg = function(input, pageId) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById(pageId).style.backgroundImage = `url('${e.target.result}')`;
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
+</body>
+</html>
